@@ -2170,9 +2170,9 @@ func Icon(nam string) image.Image {
 }
 ```
 
-##### 30.6.3  sync.Map
+##### 30.6.4  sync.Map
 
-Map并不是并发安全的
+Map并不是并发安全的，`sync.Map`适用于并发
 
 ``` go
 var m = make(map[string]int)
@@ -2214,4 +2214,1182 @@ func main{
   wg.Wait()
 }
 ```
+
+##### 30.6.5 原子操作
+
+代码中的加锁操作因为涉及内核态的上下文切换会比较耗时、代价比较高。针对基本数据类型我们还可以使用原子操作来保证并发安全，因为原子操作是Golang提供的方法，它在用户态就可以完成，因些性能比加锁操作更好， Golang中的原子操作由内制的标准库sync/atomic提供（只支持int unit类型）
+
+###  31单元测试
+
+Go语言中的测试依赖`go test`命令。编写测试代码和编写普通的Go代码过程是类似的，并不需要学习新的语法、规则或工具。
+
+go test命令是一个按照一定约定和组织的测试代码的驱动程序。在包目录内，所有以`_test.go`为后缀名的源代码文件都是`go test`测试的一部分，不会被`go build`编译到最终的可执行文件中。
+
+在`*_test.go`文件中有三种类型的函数，单元测试函数、基准测试函数和示例函数。
+
+|   类型   |         格式          |              作用              |
+| :------: | :-------------------: | :----------------------------: |
+| 测试函数 |   函数名前缀为Test    | 测试程序的一些逻辑行为是否正确 |
+| 基准函数 | 函数名前缀为Benchmark |         测试函数的性能         |
+| 示例函数 |  函数名前缀为Example  |       为文档提供示例文档       |
+
+`go test`命令会遍历所有的`*_test.go`文件中符合上述命名规则的函数，然后生成一个临时的main包用于调用相应的测试函数，然后构建并运行、报告测试结果，最后清理测试中生成的临时文件。
+
+```bash
+go test
+go test -v
+go test -run="正则" -v
+```
+
+测试函数的名字必须以`Test`开头，可选的后缀名必须以大写字母开头，举几个例子：
+
+```go
+func TestAdd(t *testing.T){ ... }
+func TestSum(t *testing.T){ ... }
+func TestLog(t *testing.T){ ... }
+```
+
+其中参数`t`用于报告测试失败和附加的日志信息。 `testing.T`的拥有的方法如下：
+
+```go
+func (c *T) Error(args ...interface{})
+func (c *T) Errorf(format string, args ...interface{})
+func (c *T) Fail()
+func (c *T) FailNow()
+func (c *T) Failed() bool
+func (c *T) Fatal(args ...interface{})
+func (c *T) Fatalf(format string, args ...interface{})
+func (c *T) Log(args ...interface{})
+func (c *T) Logf(format string, args ...interface{})
+func (c *T) Name() string
+func (t *T) Parallel()
+func (t *T) Run(name string, f func(t *T)) bool
+func (c *T) Skip(args ...interface{})
+func (c *T) SkipNow()
+func (c *T) Skipf(format string, args ...interface{})
+func (c *T) Skipped() bool
+```
+
+#### 31.1 组合测试
+
+``` go
+func TestGroupSplit(t *testing.T) {
+	type test struct {
+		str      string
+		sep      string
+		excepted []string
+	}
+	var tests = map[string]test{
+		"normal": test{"a:b:c", ":", []string{"a", "b", "c"}},
+		"none":   test{"a:b:c", "*", []string{"a:b:c"}},
+		"multi":  test{"abcfbcdbce", "bc", []string{"a", "f", "d", "e"}},
+	}
+	for name, testcase := range tests {
+		ret := Split(testcase.str, testcase.sep)
+		if ok := reflect.DeepEqual(ret, testcase.excepted); !ok {
+			t.Fatalf("Testcase:%v Failed, Excepted: %#v, got: %#v", name, testcase.excepted, ret)
+		}
+	}
+}
+```
+
+```
+go test -run /none -v // 运行指定的测试用例
+```
+
+
+
+#### 31.2 子测试
+
+``` go
+func TestGroupSplit(t *testing.T) {
+	type test struct {
+		str      string
+		sep      string
+		excepted []string
+	}
+	var tests = map[string]test{
+		"normal": test{"a:b:c", ":", []string{"a", "b", "c"}},
+		"none":   test{"a:b:c", "*", []string{"a:b:c"}},
+		"multi":  test{"abcfbcdbce", "bc", []string{"a", "f", "d", "e"}},
+	}
+	for name, testcase := range tests {
+		// ret := Split(testcase.str, testcase.sep)
+		// if ok := reflect.DeepEqual(ret, testcase.excepted); !ok {
+		// 	t.Fatalf("Testcase:%v Failed, Excepted: %#v, got: %#v", testcase.excepted, ret)
+		// }
+		t.Run(name, func(t *testing.T) {
+			ret := Split(testcase.str, testcase.sep)
+			if !reflect.DeepEqual(ret, testcase.excepted) {
+				t.Fatalf("Excepted: %#v, got: %#v", testcase.excepted, ret)
+			}
+		})
+	}
+}
+```
+
+#### 31.2 测试覆盖率
+
+测试覆盖率是你的代码被测试套件覆盖的百分比。通常我们使用的都是语句的覆盖率，也就是在测试中至少被运行一次的代码占总代码的比例。
+
+Go提供内置功能来检查你的代码覆盖率。我们可以使用`go test -cover`来查看测试覆盖率。例如
+
+```bash
+split $ go test -cover
+PASS
+coverage: 100.0% of statements
+ok      github.com/Q1mi/studygo/code_demo/test_demo/split       0.005s
+```
+
+Go还提供了一个额外的`-coverprofile`参数，用来将覆盖率相关的记录信息输出到一个文件。例如：
+
+```go
+split $ go test -cover -coverprofile=c.out
+PASS
+coverage: 100.0% of statements
+ok      github.com/Q1mi/studygo/code_demo/test_demo/split       0.005s
+```
+
+上面的命令会将覆盖率相关的信息输出到当前文件夹下面的`c.out`文件中，然后我们执行`go tool cover -html=c.out`，使用`cover`工具来处理生成的记录信息，该命令会打开本地的浏览器窗口生成一个HTML报告。![Go test cover](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/cover.png)上图中每个用绿色标记的语句块表示被覆盖了，而红色的表示没有被覆盖。
+
+#### 31.3基准测试
+
+基准测试就是在一定的工作负载之下检测程序性能的一种方法。基准测试的基本格式如下：
+
+```go
+func BenchmarkName(b *testing.B){
+    // ...
+}
+```
+
+基准测试以`Benchmark`为前缀，需要一个`*testing.B`类型的参数b，基准测试必须要执行`b.N`次，这样的测试才有对照性，`b.N`的值是系统根据实际情况去调整的，从而保证测试的稳定性。 `testing.B`拥有的方法如下：
+
+```go
+func (c *B) Error(args ...interface{})
+func (c *B) Errorf(format string, args ...interface{})
+func (c *B) Fail()
+func (c *B) FailNow()
+func (c *B) Failed() bool
+func (c *B) Fatal(args ...interface{})
+func (c *B) Fatalf(format string, args ...interface{})
+func (c *B) Log(args ...interface{})
+func (c *B) Logf(format string, args ...interface{})
+func (c *B) Name() string
+func (b *B) ReportAllocs()
+func (b *B) ResetTimer()
+func (b *B) Run(name string, f func(b *B)) bool
+func (b *B) RunParallel(body func(*PB))
+func (b *B) SetBytes(n int64)
+func (b *B) SetParallelism(p int)
+func (c *B) Skip(args ...interface{})
+func (c *B) SkipNow()
+func (c *B) Skipf(format string, args ...interface{})
+func (c *B) Skipped() bool
+func (b *B) StartTimer()
+func (b *B) StopTimer()
+```
+
+我们为split包中的`Split`函数编写基准测试如下：
+
+```go
+func BenchmarkSplit(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		Split("沙河有沙又有河", "沙")
+	}
+}
+```
+
+基准测试并不会默认执行，需要增加`-bench`参数，所以我们通过执行`go test -bench=Split`命令执行基准测试，输出结果如下：
+
+```bash
+split $ go test -bench=Split -cpu=8
+goos: darwin
+goarch: amd64
+pkg: github.com/Q1mi/studygo/code_demo/test_demo/split
+BenchmarkSplit-8        10000000               203 ns/op
+PASS
+ok      github.com/Q1mi/studygo/code_demo/test_demo/split       2.255s
+```
+
+其中`BenchmarkSplit-8`表示对Split函数进行基准测试，数字`8`表示`GOMAXPROCS`的值，这个对于并发基准测试很重要。`10000000`和`203ns/op`表示每次调用`Split`函数耗时`203ns`，这个结果是`10000000`次调用的平均值。
+
+我们还可以为基准测试添加`-benchmem`参数，来获得内存分配的统计数据。
+
+```bash
+split $ go test -bench=Split -benchmem
+goos: darwin
+goarch: amd64
+pkg: github.com/Q1mi/studygo/code_demo/test_demo/split
+BenchmarkSplit-8        10000000               215 ns/op             112 B/op          3 allocs/op
+PASS
+ok      github.com/Q1mi/studygo/code_demo/test_demo/split       2.394s
+```
+
+其中，`112 B/op`表示每次操作内存分配了112字节，`3 allocs/op`则表示每次操作进行了3次内存分配。 我们将我们的`Split`函数优化如下：
+
+```go
+func Split(s, sep string) (result []string) {
+	result = make([]string, 0, strings.Count(s, sep)+1)
+	i := strings.Index(s, sep)
+	for i > -1 {
+		result = append(result, s[:i])
+		s = s[i+len(sep):] // 这里使用len(sep)获取sep的长度
+		i = strings.Index(s, sep)
+	}
+	result = append(result, s)
+	return
+}
+```
+
+这一次我们提前使用make函数将result初始化为一个容量足够大的切片，而不再像之前一样通过调用append函数来追加。我们来看一下这个改进会带来多大的性能提升：
+
+```bash
+split $ go test -bench=Split -benchmem
+goos: darwin
+goarch: amd64
+pkg: github.com/Q1mi/studygo/code_demo/test_demo/split
+BenchmarkSplit-8        10000000               127 ns/op              48 B/op          1 allocs/op
+PASS
+ok      github.com/Q1mi/studygo/code_demo/test_demo/split       1.423s
+```
+
+这个使用make函数提前分配内存的改动，减少了2/3的内存分配次数，并且减少了一半的内存分配。
+
+#### 31.4 性能比较函数
+
+上面的基准测试只能得到给定操作的绝对耗时，但是在很多性能问题是发生在两个不同操作之间的相对耗时，比如同一个函数处理1000个元素的耗时与处理1万甚至100万个元素的耗时的差别是多少？再或者对于同一个任务究竟使用哪种算法性能最佳？我们通常需要对两个不同算法的实现使用相同的输入来进行基准比较测试。
+
+性能比较函数通常是一个带有参数的函数，被多个不同的Benchmark函数传入不同的值来调用。举个例子如下：
+
+```go
+func benchmark(b *testing.B, size int){/* ... */}
+func Benchmark10(b *testing.B){ benchmark(b, 10) }
+func Benchmark100(b *testing.B){ benchmark(b, 100) }
+func Benchmark1000(b *testing.B){ benchmark(b, 1000) }
+```
+
+例如我们编写了一个计算斐波那契数列的函数如下：
+
+```go
+// fib.go
+
+// Fib 是一个计算第n个斐波那契数的函数
+func Fib(n int) int {
+	if n < 2 {
+		return n
+	}
+	return Fib(n-1) + Fib(n-2)
+}
+```
+
+我们编写的性能比较函数如下：
+
+```go
+// fib_test.go
+
+func benchmarkFib(b *testing.B, n int) {
+	for i := 0; i < b.N; i++ {
+		Fib(n)
+	}
+}
+
+func BenchmarkFib1(b *testing.B)  { benchmarkFib(b, 1) }
+func BenchmarkFib2(b *testing.B)  { benchmarkFib(b, 2) }
+func BenchmarkFib3(b *testing.B)  { benchmarkFib(b, 3) }
+func BenchmarkFib10(b *testing.B) { benchmarkFib(b, 10) }
+func BenchmarkFib20(b *testing.B) { benchmarkFib(b, 20) }
+func BenchmarkFib40(b *testing.B) { benchmarkFib(b, 40) }
+```
+
+运行基准测试：
+
+```bash
+split $ go test -bench=.
+goos: darwin
+goarch: amd64
+pkg: github.com/Q1mi/studygo/code_demo/test_demo/fib
+BenchmarkFib1-8         1000000000               2.03 ns/op
+BenchmarkFib2-8         300000000                5.39 ns/op
+BenchmarkFib3-8         200000000                9.71 ns/op
+BenchmarkFib10-8         5000000               325 ns/op
+BenchmarkFib20-8           30000             42460 ns/op
+BenchmarkFib40-8               2         638524980 ns/op
+PASS
+ok      github.com/Q1mi/studygo/code_demo/test_demo/fib 12.944s
+```
+
+这里需要注意的是，默认情况下，每个基准测试至少运行1秒。如果在Benchmark函数返回时没有到1秒，则b.N的值会按1,2,5,10,20,50，…增加，并且函数再次运行。
+
+最终的BenchmarkFib40只运行了两次，每次运行的平均值只有不到一秒。像这种情况下我们应该可以使用`-benchtime`标志增加最小基准时间，以产生更准确的结果。例如：
+
+```bash
+split $ go test -bench=Fib40 -benchtime=20s
+goos: darwin
+goarch: amd64
+pkg: github.com/Q1mi/studygo/code_demo/test_demo/fib
+BenchmarkFib40-8              50         663205114 ns/op
+PASS
+ok      github.com/Q1mi/studygo/code_demo/test_demo/fib 33.849s
+```
+
+这一次`BenchmarkFib40`函数运行了50次，结果就会更准确一些了。
+
+使用性能比较函数做测试的时候一个容易犯的错误就是把`b.N`作为输入的大小，例如以下两个例子都是错误的示范：
+
+```go
+// 错误示范1
+func BenchmarkFibWrong(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		Fib(n)
+	}
+}
+
+// 错误示范2
+func BenchmarkFibWrong2(b *testing.B) {
+	Fib(b.N)
+}
+```
+
+#### 31.5 重置时间
+
+`b.ResetTimer`之前的处理不会放到执行时间里，也不会输出到报告中，所以可以在之前做一些不计划作为测试报告的操作。例如：
+
+```go
+func BenchmarkSplit(b *testing.B) {
+	time.Sleep(5 * time.Second) // 假设需要做一些耗时的无关操作
+	b.ResetTimer()              // 重置计时器
+	for i := 0; i < b.N; i++ {
+		Split("沙河有沙又有河", "沙")
+	}
+}
+```
+
+#### 31.6 并行测试
+
+`func (b *B) RunParallel(body func(*PB))`会以并行的方式执行给定的基准测试。
+
+`RunParallel`会创建出多个`goroutine`，并将`b.N`分配给这些`goroutine`执行， 其中`goroutine`数量的默认值为`GOMAXPROCS`。用户如果想要增加非CPU受限（non-CPU-bound）基准测试的并行性， 那么可以在`RunParallel`之前调用`SetParallelism` 。`RunParallel`通常会与`-cpu`标志一同使用。
+
+```go
+func BenchmarkSplitParallel(b *testing.B) {
+	// b.SetParallelism(1) // 设置使用的CPU数
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			Split("沙河有沙又有河", "沙")
+		}
+	})
+}
+```
+
+执行一下基准测试：
+
+```bash
+split $ go test -bench=.
+goos: darwin
+goarch: amd64
+pkg: github.com/Q1mi/studygo/code_demo/test_demo/split
+BenchmarkSplit-8                10000000               131 ns/op
+BenchmarkSplitParallel-8        50000000                36.1 ns/op
+PASS
+ok      github.com/Q1mi/studygo/code_demo/test_demo/split       3.308s
+```
+
+还可以通过在测试命令后添加`-cpu`参数如`go test -bench=. -cpu 1`来指定使用的CPU数量。
+
+#### 31.7  Setup和TearDown
+
+测试程序有时需要在测试之前进行额外的设置（setup）或在测试之后进行拆卸（teardown）。
+
+##### 31.7.1 TestMain
+
+通过在`*_test.go`文件中定义`TestMain`函数来可以在测试之前进行额外的设置（setup）或在测试之后进行拆卸（teardown）操作。
+
+如果测试文件包含函数:`func TestMain(m *testing.M)`那么生成的测试会先调用 TestMain(m)，然后再运行具体测试。`TestMain`运行在主`goroutine`中, 可以在调用 `m.Run`前后做任何设置（setup）和拆卸（teardown）。退出测试的时候应该使用`m.Run`的返回值作为参数调用`os.Exit`。
+
+一个使用`TestMain`来设置Setup和TearDown的示例如下：
+
+```go
+func TestMain(m *testing.M) {
+	fmt.Println("write setup code here...") // 测试之前的做一些设置
+	// 如果 TestMain 使用了 flags，这里应该加上flag.Parse()
+	retCode := m.Run()                         // 执行测试
+	fmt.Println("write teardown code here...") // 测试之后做一些拆卸工作
+	os.Exit(retCode)                           // 退出测试
+}
+```
+
+需要注意的是：在调用`TestMain`时, `flag.Parse`并没有被调用。所以如果`TestMain` 依赖于command-line标志 (包括 testing 包的标记), 则应该显示的调用`flag.Parse`。
+
+##### 31.7.1 子测试的Setup与Teardown
+
+有时候我们可能需要为每个测试集设置Setup与Teardown，也有可能需要为每个子测试设置Setup与Teardown。下面我们定义两个函数工具函数如下：
+
+```go
+// 测试集的Setup与Teardown
+func setupTestCase(t *testing.T) func(t *testing.T) {
+	t.Log("如有需要在此执行:测试之前的setup")
+	return func(t *testing.T) {
+		t.Log("如有需要在此执行:测试之后的teardown")
+	}
+}
+
+// 子测试的Setup与Teardown
+func setupSubTest(t *testing.T) func(t *testing.T) {
+	t.Log("如有需要在此执行:子测试之前的setup")
+	return func(t *testing.T) {
+		t.Log("如有需要在此执行:子测试之后的teardown")
+	}
+}
+```
+
+使用方式如下：
+
+```go
+func TestSplit(t *testing.T) {
+	type test struct { // 定义test结构体
+		input string
+		sep   string
+		want  []string
+	}
+	tests := map[string]test{ // 测试用例使用map存储
+		"simple":      {input: "a:b:c", sep: ":", want: []string{"a", "b", "c"}},
+		"wrong sep":   {input: "a:b:c", sep: ",", want: []string{"a:b:c"}},
+		"more sep":    {input: "abcd", sep: "bc", want: []string{"a", "d"}},
+		"leading sep": {input: "沙河有沙又有河", sep: "沙", want: []string{"", "河有", "又有河"}},
+	}
+	teardownTestCase := setupTestCase(t) // 测试之前执行setup操作
+	defer teardownTestCase(t)            // 测试之后执行testdoen操作
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) { // 使用t.Run()执行子测试
+			teardownSubTest := setupSubTest(t) // 子测试之前执行setup操作
+			defer teardownSubTest(t)           // 测试之后执行testdoen操作
+			got := Split(tc.input, tc.sep)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("excepted:%#v, got:%#v", tc.want, got)
+			}
+		})
+	}
+}
+```
+
+测试结果如下：
+
+```bash
+split $ go test -v
+=== RUN   TestSplit
+=== RUN   TestSplit/simple
+=== RUN   TestSplit/wrong_sep
+=== RUN   TestSplit/more_sep
+=== RUN   TestSplit/leading_sep
+--- PASS: TestSplit (0.00s)
+    split_test.go:71: 如有需要在此执行:测试之前的setup
+    --- PASS: TestSplit/simple (0.00s)
+        split_test.go:79: 如有需要在此执行:子测试之前的setup
+        split_test.go:81: 如有需要在此执行:子测试之后的teardown
+    --- PASS: TestSplit/wrong_sep (0.00s)
+        split_test.go:79: 如有需要在此执行:子测试之前的setup
+        split_test.go:81: 如有需要在此执行:子测试之后的teardown
+    --- PASS: TestSplit/more_sep (0.00s)
+        split_test.go:79: 如有需要在此执行:子测试之前的setup
+        split_test.go:81: 如有需要在此执行:子测试之后的teardown
+    --- PASS: TestSplit/leading_sep (0.00s)
+        split_test.go:79: 如有需要在此执行:子测试之前的setup
+        split_test.go:81: 如有需要在此执行:子测试之后的teardown
+    split_test.go:73: 如有需要在此执行:测试之后的teardown
+=== RUN   ExampleSplit
+--- PASS: ExampleSplit (0.00s)
+PASS
+ok      github.com/Q1mi/studygo/code_demo/test_demo/split       0.006s
+```
+
+##### 31.7.2 示例函数
+
+被`go test`特殊对待的第三种函数就是示例函数，它们的函数名以`Example`为前缀。它们既没有参数也没有返回值。标准格式如下：
+
+```go
+func ExampleName() {
+    // ...
+}
+```
+
+### 32 TCP编辑
+
+#### 32.1 七层协议
+
+![osi七层模型](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/osi.png)
+
+#### 32.2 Socket图解
+
+![socket图解](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/socket.png)
+
+#### 32.3 HTTP数据传输图解
+
+![HTTP数据传输图解](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/httptcpip.png)
+
+#### 32.3 unicode包
+
+unicode.IsLetter():
+
+unicode.ToLower():
+
+unicode.ToUpper():
+
+#### 32.4 粘包
+
+主要原因：
+
+就是tcp数据传递模式是流模式，在保持长连接的时候可以进行多次的收和发。
+
+“粘包”可发生在发送端也可发生在接收端：
+
+1. 由Nagle算法造成的发送端的粘包：Nagle算法是一种改善网络传输效率的算法。简单来说就是当我们提交一段数据给TCP发送时，TCP并不立刻发送此段数据，而是等待一小段时间看看在等待期间是否还有要发送的数据，若有则会一次把这两段数据发送出去。
+2. 接收端接收不及时造成的接收端粘包：TCP会把接收到的数据存在自己的缓冲区中，然后通知应用层取数据。当应用层由于某些原因不能及时的把TCP的数据取出来，就会造成TCP缓冲区中存放了几段数据。
+
+解决办法：
+
+出现”粘包”的关键在于接收方不确定将要传输的数据包的大小，因此我们可以对数据包进行封包和拆包的操作。
+
+封包：封包就是给一段数据加上包头，这样一来数据包就分为包头和包体两部分内容了(过滤非法包时封包会加入”包尾”内容)。包头部分的长度是固定的，并且它存储了包体的长度，根据包头长度固定以及包头中含有包体长度的变量就能正确的拆分出一个完整的数据包。
+
+我们可以自己定义一个协议，比如数据包的前4个字节为包头，里面存储的是发送的数据的长度。
+
+```go
+// socket_stick/proto/proto.go
+package proto
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/binary"
+)
+
+// Encode 将消息编码
+func Encode(message string) ([]byte, error) {
+	// 读取消息的长度，转换成int32类型（占4个字节）
+	var length = int32(len(message))
+	var pkg = new(bytes.Buffer)
+	// 写入消息头
+  // 按照小端的方式写入pkg
+	err := binary.Write(pkg, binary.LittleEndian, length)
+	if err != nil {
+		return nil, err
+	}
+	// 写入消息实体
+	err = binary.Write(pkg, binary.LittleEndian, []byte(message))
+	if err != nil {
+		return nil, err
+	}
+	return pkg.Bytes(), nil
+}
+
+// Decode 解码消息
+func Decode(reader *bufio.Reader) (string, error) {
+	// 读取消息的长度
+	lengthByte, _ := reader.Peek(4) // 读取前4个字节的数据
+	lengthBuff := bytes.NewBuffer(lengthByte)
+	var length int32
+	err := binary.Read(lengthBuff, binary.LittleEndian, &length)
+	if err != nil {
+		return "", err
+	}
+	// Buffered返回缓冲中现有的可读取的字节数。
+	if int32(reader.Buffered()) < length+4 {
+		return "", err
+	}
+
+	// 读取真正的消息数据
+	pack := make([]byte, int(4+length))
+	_, err = reader.Read(pack)
+	if err != nil {
+		return "", err
+	}
+	return string(pack[4:]), nil
+}
+```
+
+大端，小端
+
+![image-20201224061058791](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20201224061058791.png)
+
+接下来在服务端和客户端分别使用上面定义的`proto`包的`Decode`和`Encode`函数处理数据。
+
+服务端代码如下：
+
+```go
+// socket_stick/server2/main.go
+
+func process(conn net.Conn) {
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+	for {
+		msg, err := proto.Decode(reader)
+		if err == io.EOF {
+			return
+		}
+		if err != nil {
+			fmt.Println("decode msg failed, err:", err)
+			return
+		}
+		fmt.Println("收到client发来的数据：", msg)
+	}
+}
+
+func main() {
+
+	listen, err := net.Listen("tcp", "127.0.0.1:30000")
+	if err != nil {
+		fmt.Println("listen failed, err:", err)
+		return
+	}
+	defer listen.Close()
+	for {
+		conn, err := listen.Accept()
+		if err != nil {
+			fmt.Println("accept failed, err:", err)
+			continue
+		}
+		go process(conn)
+	}
+}
+```
+
+客户端代码如下：
+
+```go
+// socket_stick/client2/main.go
+
+func main() {
+	conn, err := net.Dial("tcp", "127.0.0.1:30000")
+	if err != nil {
+		fmt.Println("dial failed, err", err)
+		return
+	}
+	defer conn.Close()
+	for i := 0; i < 20; i++ {
+		msg := `Hello, Hello. How are you?`
+		data, err := proto.Encode(msg)
+		if err != nil {
+			fmt.Println("encode msg failed, err:", err)
+			return
+		}
+		conn.Write(data)
+	}
+}
+```
+
+
+
+### 33 HTML
+
+```html
+<ul type="circle">
+  <li></li>
+</ul>
+
+<ol type="I"> <!--罗马数字-->
+  <li></li>
+</ol>
+<dl>
+  <dt></dt>
+  <dd></dd>
+</dl>
+```
+
+### 34  template
+
+#### 34.1 Go语言的模板引擎
+
+Go语言内置了文本模板引擎`text/template`和用于HTML文档的`html/template`。它们的作用机制可以简单归纳如下：
+
+1. 模板文件通常定义为`.tmpl`和`.tpl`为后缀（也可以使用其他的后缀），必须使用`UTF8`编码。
+2. 模板文件中使用`{{`和`}}`包裹和标识需要传入的数据。
+3. 传给模板这样的数据就可以通过点号（`.`）来访问，如果数据是复杂类型的数据，可以通过{ { .FieldName }}来访问它的字段。
+4. 除`{{`和`}}`包裹的内容外，其他内容均不做修改原样输出。
+
+##### 34.1.1 定义模板文件
+
+我们按照Go模板语法定义一个`hello.tmpl`的模板文件，内容如下：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Hello</title>
+</head>
+<body>
+    <p>Hello {{.}}</p>
+</body>
+</html>
+```
+
+##### 34.1.2 解析和渲染模板文件
+
+然后我们创建一个`main.go`文件，在其中写下HTTP server端代码如下：
+
+```go
+// main.go
+
+func sayHello(w http.ResponseWriter, r *http.Request) {
+	// 解析指定文件生成模板对象
+	tmpl, err := template.ParseFiles("./hello.tmpl")
+	if err != nil {
+		fmt.Println("create template failed, err:", err)
+		return
+	}
+	// 利用给定数据渲染模板，并将结果写入w
+	tmpl.Execute(w, "沙河小王子")
+}
+func main() {
+	http.HandleFunc("/", sayHello)
+	err := http.ListenAndServe(":9090", nil)
+	if err != nil {
+		fmt.Println("HTTP server failed,err:", err)
+		return
+	}
+}
+```
+
+将上面的`main.go`文件编译执行，然后使用浏览器访问`http://127.0.0.1:9090`就能看到页面上显示了“Hello 沙河小王子”。 这就是一个最简单的模板渲染的示例，Go语言模板引擎详细用法请往下阅读。
+
+#### 34.2 模板语法
+
+##### 34.2.1 {{.}}
+
+模板语法都包含在`{{`和`}}`中间，其中`{{.}}`中的点表示当前对象。
+
+当我们传入一个结构体对象时，我们可以根据`.`来访问结构体的对应字段。例如：
+
+```go
+// main.go
+
+type UserInfo struct {
+	Name   string
+	Gender string
+	Age    int
+}
+
+func sayHello(w http.ResponseWriter, r *http.Request) {
+	// 解析指定文件生成模板对象
+	tmpl, err := template.ParseFiles("./hello.tmpl")
+	if err != nil {
+		fmt.Println("create template failed, err:", err)
+		return
+	}
+	// 利用给定数据渲染模板，并将结果写入w
+	user := UserInfo{
+		Name:   "小王子",
+		Gender: "男",
+		Age:    18,
+	}
+	tmpl.Execute(w, user)
+}
+```
+
+模板文件`hello.tmpl`内容如下：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Hello</title>
+</head>
+<body>
+    <p>Hello {{.Name}}</p>
+    <p>性别：{{.Gender}}</p>
+    <p>年龄：{{.Age}}</p>
+</body>
+</html>
+```
+
+同理，当我们传入的变量是map时，也可以在模板文件中通过`.`根据key来取值。
+
+##### 34.2.2 注释
+
+```template
+{{/* a comment */}}
+注释，执行时会忽略。可以多行。注释不能嵌套，并且必须紧贴分界符始止。
+```
+
+##### 34.2.3 pipeline
+
+`pipeline`是指产生数据的操作。比如`{{.}}`、`{{.Name}}`等。Go的模板语法中支持使用管道符号`|`链接多个命令，用法和unix下的管道类似：`|`前面的命令会将运算结果(或返回值)传递给后一个命令的最后一个位置。
+
+**注意：**并不是只有使用了`|`才是pipeline。Go的模板语法中，`pipeline的`概念是传递数据，只要能产生数据的，都是`pipeline`。
+
+##### 34.2.4 变量
+
+我们还可以在模板中声明变量，用来保存传入模板的数据或其他语句生成的结果。具体语法如下：
+
+```template
+$obj := {{.}}
+```
+
+其中`$obj`是变量的名字，在后续的代码中就可以使用该变量了。
+
+##### 34.2.5 移除空格
+
+有时候我们在使用模板语法的时候会不可避免的引入一下空格或者换行符，这样模板最终渲染出来的内容可能就和我们想的不一样，这个时候可以使用`{{-`语法去除模板内容左侧的所有空白符号， 使用`-}}`去除模板内容右侧的所有空白符号。
+
+例如：
+
+```template
+{{- .Name -}}
+```
+
+**注意：**`-`要紧挨`{{`和`}}`，同时与模板值之间需要使用空格分隔。
+
+
+
+##### 34.2.6 条件判断
+
+Go模板语法中的条件判断有以下几种:
+
+```template
+{{if pipeline}} T1 {{end}}
+
+{{if pipeline}} T1 {{else}} T0 {{end}}
+
+{{if pipeline}} T1 {{else if pipeline}} T0 {{end}}
+```
+
+
+
+##### 34.2.7 range
+
+Go的模板语法中使用`range`关键字进行遍历，有以下两种写法，其中`pipeline`的值必须是数组、切片、字典或者通道。
+
+```template
+{{range pipeline}} T1 {{end}}
+如果pipeline的值其长度为0，不会有任何输出
+
+{{range pipeline}} T1 {{else}} T0 {{end}}
+如果pipeline的值其长度为0，则会执行T0。
+```
+
+
+
+##### 34.2.8 with
+
+```template
+{{with pipeline}} T1 {{end}}
+如果pipeline为empty不产生输出，否则将dot设为pipeline的值并执行T1。不修改外面的dot。
+
+{{with pipeline}} T1 {{else}} T0 {{end}}
+如果pipeline为empty，不改变dot并执行T0，否则dot设为pipeline的值并执行T1。
+```
+
+
+
+##### 34.2.9 预定义函数
+
+```template
+and
+    函数返回它的第一个empty参数或者最后一个参数；
+    就是说"and x y"等价于"if x then y else x"；所有参数都会执行；
+or
+    返回第一个非empty参数或者最后一个参数；
+    亦即"or x y"等价于"if x then x else y"；所有参数都会执行；
+not
+    返回它的单个参数的布尔值的否定
+len
+    返回它的参数的整数类型长度
+index
+    执行结果为第一个参数以剩下的参数为索引/键指向的值；
+    如"index x 1 2 3"返回x[1][2][3]的值；每个被索引的主体必须是数组、切片或者字典。
+print
+    即fmt.Sprint
+printf
+    即fmt.Sprintf
+println
+    即fmt.Sprintln
+html
+    返回与其参数的文本表示形式等效的转义HTML。
+    这个函数在html/template中不可用。
+urlquery
+    以适合嵌入到网址查询中的形式返回其参数的文本表示的转义值。
+    这个函数在html/template中不可用。
+js
+    返回与其参数的文本表示形式等效的转义JavaScript。
+call
+    执行结果是调用第一个参数的返回值，该参数必须是函数类型，其余参数作为调用该函数的参数；
+    如"call .X.Y 1 2"等价于go语言里的dot.X.Y(1, 2)；
+    其中Y是函数类型的字段或者字典的值，或者其他类似情况；
+    call的第一个参数的执行结果必须是函数类型的值（和预定义函数如print明显不同）；
+    该函数类型值必须有1到2个返回值，如果有2个则后一个必须是error接口类型；
+    如果有2个返回值的方法返回的error非nil，模板执行会中断并返回给调用模板执行者该错误；
+```
+
+
+
+##### 34.2.10 比较函数
+
+布尔函数会将任何类型的零值视为假，其余视为真。
+
+下面是定义为函数的二元比较运算的集合：
+
+```template
+eq      如果arg1 == arg2则返回真
+ne      如果arg1 != arg2则返回真
+lt      如果arg1 < arg2则返回真
+le      如果arg1 <= arg2则返回真
+gt      如果arg1 > arg2则返回真
+ge      如果arg1 >= arg2则返回真
+```
+
+为了简化多参数相等检测，eq（只有eq）可以接受2个或更多个参数，它会将第一个参数和其余参数依次比较，返回下式的结果：
+
+```template
+{{eq arg1 arg2 arg3}}
+```
+
+比较函数只适用于基本类型（或重定义的基本类型，如”type Celsius float32”）。但是，整数和浮点数不能互相比较。
+
+
+
+##### 34.2.11 自定义函数
+
+Go的模板支持自定义函数。
+
+```go
+func sayHello(w http.ResponseWriter, r *http.Request) {
+	htmlByte, err := ioutil.ReadFile("./hello.tmpl")
+	if err != nil {
+		fmt.Println("read html failed, err:", err)
+		return
+	}
+	// 自定义一个夸人的模板函数
+	kua := func(arg string) (string, error) {
+		return arg + "真帅", nil
+	}
+	// 采用链式操作在Parse之前调用Funcs添加自定义的kua函数
+	tmpl, err := template.New("hello").Funcs(template.FuncMap{"kua": kua}).Parse(string(htmlByte))
+	if err != nil {
+		fmt.Println("create template failed, err:", err)
+		return
+	}
+
+	user := UserInfo{
+		Name:   "小王子",
+		Gender: "男",
+		Age:    18,
+	}
+	// 使用user渲染模板，并将结果写入w
+	tmpl.Execute(w, user)
+}
+```
+
+我们可以在模板文件`hello.tmpl`中按照如下方式使用我们自定义的`kua`函数了。
+
+```template
+{{kua .Name}}
+```
+
+
+
+##### 34.2.12 嵌套template
+
+我们可以在template中嵌套其他的template。这个template可以是单独的文件，也可以是通过`define`定义的template。
+
+举个例子： `t.tmpl`文件内容如下：
+
+```template
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>tmpl test</title>
+</head>
+<body>
+    
+    <h1>测试嵌套template语法</h1>
+    <hr>
+    {{template "ul.tmpl"}}
+    <hr>
+    {{template "ol.tmpl"}}
+</body>
+</html>
+
+{{ define "ol.tmpl"}}
+<ol>
+    <li>吃饭</li>
+    <li>睡觉</li>
+    <li>打豆豆</li>
+</ol>
+{{end}}
+```
+
+`ul.tmpl`文件内容如下：
+
+```template
+<ul>
+    <li>注释</li>
+    <li>日志</li>
+    <li>测试</li>
+</ul>
+```
+
+我们注册一个`templDemo`路由处理函数.
+
+```go
+http.HandleFunc("/tmpl", tmplDemo)
+```
+
+`tmplDemo`函数的具体内容如下：
+
+```go
+func tmplDemo(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("./t.tmpl", "./ul.tmpl")
+	if err != nil {
+		fmt.Println("create template failed, err:", err)
+		return
+	}
+	user := UserInfo{
+		Name:   "小王子",
+		Gender: "男",
+		Age:    18,
+	}
+	tmpl.Execute(w, user)
+}
+```
+
+**注意**：在解析模板时，被嵌套的模板一定要在后面解析，例如上面的示例中`t.tmpl`模板中嵌套了`ul.tmpl`，所以`ul.tmpl`要在`t.tmpl`后进行解析。
+
+##### 34.2.13 block
+
+```template
+{{block "name" pipeline}} T1 {{end}}
+```
+
+`block`是定义模板`{{define "name"}} T1 {{end}}`和执行`{{template "name" pipeline}}`缩写，典型的用法是定义一组根模板，然后通过在其中重新定义块模板进行自定义。
+
+定义一个根模板`templates/base.tmpl`，内容如下：
+
+```template
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>Go Templates</title>
+</head>
+<body>
+<div class="container-fluid">
+    {{block "content" . }}{{end}}
+</div>
+</body>
+</html>
+```
+
+然后定义一个`templates/index.tmpl`，”继承”`base.tmpl`：
+
+```tempalte
+{{template "base.tmpl"}}
+
+{{define "content"}}
+    <div>Hello world!</div>
+{{end}}
+```
+
+然后使用`template.ParseGlob`按照正则匹配规则解析模板文件，然后通过`ExecuteTemplate`渲染指定的模板：
+
+```go
+func index(w http.ResponseWriter, r *http.Request){
+	tmpl, err := template.ParseGlob("templates/*.tmpl")
+	if err != nil {
+		fmt.Println("create template failed, err:", err)
+		return
+	}
+	err = tmpl.ExecuteTemplate(w, "index.tmpl", nil)
+	if err != nil {
+		fmt.Println("render template failed, err:", err)
+		return
+	}
+}
+```
+
+如果我们的模板名称冲突了，例如不同业务线下都定义了一个`index.tmpl`模板，我们可以通过下面两种方法来解决。
+
+1. 在模板文件开头使用`{{define 模板名}}`语句显式的为模板命名。
+2. 可以把模板文件存放在`templates`文件夹下面的不同目录中，然后使用`template.ParseGlob("templates/**/*.tmpl")`解析模板。
+
+
+
+##### 34.2.14 修改默认的标识符
+
+Go标准库的模板引擎使用的花括号`{{`和`}}`作为标识，而许多前端框架（如`Vue`和 `AngularJS`）也使用`{{`和`}}`作为标识符，所以当我们同时使用Go语言模板引擎和以上前端框架时就会出现冲突，这个时候我们需要修改标识符，修改前端的或者修改Go语言的。这里演示如何修改Go语言模板引擎默认的标识符：
+
+```go
+template.New("test").Delims("{[", "]}").ParseFiles("./t.tmpl")
+```
+
+#### 34.3 text/template与html/tempalte的区别
+
+`html/template`针对的是需要返回HTML内容的场景，在模板渲染过程中会对一些有风险的内容进行转义，以此来防范跨站脚本攻击。
+
+例如，我定义下面的模板文件：
+
+```template
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Hello</title>
+</head>
+<body>
+    {{.}}
+</body>
+</html>
+```
+
+这个时候传入一段JS代码并使用`html/template`去渲染该文件，会在页面上显示出转义后的JS内容。`<script>alert('嘿嘿嘿')</script>` 这就是`html/template`为我们做的事。
+
+但是在某些场景下，我们如果相信用户输入的内容，不想转义的话，可以自行编写一个safe函数，手动返回一个`template.HTML`类型的内容。示例如下：
+
+```go
+func xss(w http.ResponseWriter, r *http.Request){
+	tmpl,err := template.New("xss.tmpl").Funcs(template.FuncMap{
+		"safe": func(s string)template.HTML {
+			return template.HTML(s)
+		},
+	}).ParseFiles("./xss.tmpl")
+	if err != nil {
+		fmt.Println("create template failed, err:", err)
+		return
+	}
+	jsStr := `<script>alert('嘿嘿嘿')</script>`
+	err = tmpl.Execute(w, jsStr)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+```
+
+这样我们只需要在模板文件不需要转义的内容后面使用我们定义好的safe函数就可以了。
+
+```template
+{{ . | safe }}
+```
+
+### 35 数据库和消息对列
+
+#### 35.1 mysql
+
+驱动：import _ "github.com/go-sql-driver/mysql"
+
+sqlx: 查询单条，查询多条，执行SQL，事务，预处理
+
+![image-20201225073942103](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20201225073942103.png)
+
+#### 35.2 redis
+
+#### 35.3 NSQ(消息对列)
 
