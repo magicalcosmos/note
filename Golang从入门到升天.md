@@ -3393,3 +3393,1935 @@ sqlx: 查询单条，查询多条，执行SQL，事务，预处理
 
 #### 35.3 NSQ(消息对列)
 
+### 36 godep
+
+#### 36.1 安装
+
+```bash
+go get github.com/tools/godep
+```
+
+#### 36.2 基本命令
+
+```bash
+godep save     将依赖项输出并复制到Godeps.json文件中
+godep go       使用保存的依赖项运行go工具
+godep get      下载并安装具有指定依赖项的包
+godep path     打印依赖的GOPATH路径
+godep restore  在GOPATH中拉取依赖的版本
+godep update   更新选定的包或go版本
+godep diff     显示当前和以前保存的依赖项集之间的差异
+godep version  查看版本信息
+```
+
+### 37  go module
+
+`go module`是Go1.11版本之后官方推出的版本管理工具，并且从Go1.13版本开始，`go module`将是Go语言默认的依赖管理工具。
+
+#### 37.1 GO111MODULE
+
+要启用`go module`支持首先要设置环境变量`GO111MODULE`，通过它可以开启或关闭模块支持，它有三个可选值：`off`、`on`、`auto`，默认值是`auto`。
+
+1. `GO111MODULE=off`禁用模块支持，编译时会从`GOPATH`和`vendor`文件夹中查找包。
+2. `GO111MODULE=on`启用模块支持，编译时会忽略`GOPATH`和`vendor`文件夹，只根据 `go.mod`下载依赖。
+3. `GO111MODULE=auto`，当项目在`$GOPATH/src`外且项目根目录有`go.mod`文件时，开启模块支持。
+
+简单来说，设置`GO111MODULE=on`之后就可以使用`go module`了，以后就没有必要在GOPATH中创建项目了，并且还能够很好的管理项目依赖的第三方包信息。
+
+使用 go module 管理依赖后会在项目根目录下生成两个文件`go.mod`和`go.sum`。
+
+#### 37.2 GOPROXY
+
+Go1.11之后设置GOPROXY命令为：
+
+```bash
+export GOPROXY=https://goproxy.cn
+```
+
+Go1.13之后`GOPROXY`默认值为`https://proxy.golang.org`，在国内是无法访问的，所以十分建议大家设置GOPROXY，这里我推荐使用[goproxy.cn](https://studygolang.com/topics/10014)。
+
+```bash
+go env -w GOPROXY=https://goproxy.cn,direct
+```
+
+#### 37.3 go mod命令
+
+常用的`go mod`命令如下：
+
+```
+go mod download    下载依赖的module到本地cache（默认为$GOPATH/pkg/mod目录）
+go mod edit        编辑go.mod文件
+go mod graph       打印模块依赖图
+go mod init        初始化当前文件夹, 创建go.mod文件
+go mod tidy        增加缺少的module，删除无用的module
+go mod vendor      将依赖复制到vendor下
+go mod verify      校验依赖
+go mod why         解释为什么需要依赖
+```
+
+#### 37.4 go.mod
+
+go.mod文件记录了项目所有的依赖信息，其结构大致如下：
+
+```sh
+module github.com/Q1mi/studygo/blogger
+
+go 1.12
+
+require (
+	github.com/DeanThompson/ginpprof v0.0.0-20190408063150-3be636683586
+	github.com/gin-gonic/gin v1.4.0
+	github.com/go-sql-driver/mysql v1.4.1
+	github.com/jmoiron/sqlx v1.2.0
+	github.com/satori/go.uuid v1.2.0
+	google.golang.org/appengine v1.6.1 // indirect
+)
+```
+
+其中，
+
+- `module`用来定义包名
+- `require`用来定义依赖包及版本
+- `indirect`表示间接引用
+
+##### 37.4.1 依赖的版本
+
+go mod支持语义化版本号，比如`go get foo@v1.2.3`，也可以跟git的分支或tag，比如`go get foo@master`，当然也可以跟git提交哈希，比如`go get foo@e3702bed2`。关于依赖的版本支持以下几种格式：
+
+```go
+gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
+gopkg.in/vmihailenco/msgpack.v2 v2.9.1
+gopkg.in/yaml.v2 <=v2.2.1
+github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
+latest
+```
+
+##### 37.4.2 replace
+
+在国内访问golang.org/x的各个包都需要翻墙，你可以在go.mod中使用replace替换成github上对应的库。
+
+```go
+replace (
+	golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac => github.com/golang/crypto v0.0.0-20180820150726-614d502a4dac
+	golang.org/x/net v0.0.0-20180821023952-922f4815f713 => github.com/golang/net v0.0.0-20180826012351-8a410e7b638d
+	golang.org/x/text v0.3.0 => github.com/golang/text v0.3.0
+)
+```
+
+#### 37.5 go get
+
+在项目中执行`go get`命令可以下载依赖包，并且还可以指定下载的版本。
+
+1. 运行`go get -u`将会升级到最新的次要版本或者修订版本(x.y.z, z是修订版本号， y是次要版本号)
+2. 运行`go get -u=patch`将会升级到最新的修订版本
+3. 运行`go get package@version`将会升级到指定的版本号version
+
+如果下整理依赖载所有依赖可以使用`go mod download`命令。
+
+#### 37.6 整理依赖
+
+我们在代码中删除依赖代码后，相关的依赖库并不会在`go.mod`文件中自动移除。这种情况下我们可以使用`go mod tidy`命令更新`go.mod`中的依赖关系。
+
+#### 37.7 go mod edit
+
+##### 37.7.1 格式化
+
+因为我们可以手动修改go.mod文件，所以有些时候需要格式化该文件。Go提供了一下命令：
+
+```bash
+go mod edit -fmt
+```
+
+##### 37.7.2 添加依赖项
+
+```bash
+go mod edit -require=golang.org/x/text
+```
+
+##### 37.7.3 移除依赖项
+
+如果只是想修改`go.mod`文件中的内容，那么可以运行`go mod edit -droprequire=package path`，比如要在`go.mod`中移除`golang.org/x/text`包，可以使用如下命令：
+
+```bash
+go mod edit -droprequire=golang.org/x/text
+```
+
+关于`go mod edit`的更多用法可以通过`go help mod edit`查看。
+
+#### 37.8 在项目中使用go module
+
+##### 37.8.1 既有项目
+
+如果需要对一个已经存在的项目启用`go module`，可以按照以下步骤操作：
+
+1. 在项目目录下执行`go mod init`，生成一个`go.mod`文件。
+2. 执行`go get`，查找并记录当前项目的依赖，同时生成一个`go.sum`记录每个依赖库的版本和哈希值。
+
+##### 37.8.2 新项目
+
+对于一个新创建的项目，我们可以在项目文件夹下按照以下步骤操作：
+
+1. 执行`go mod init 项目名`命令，在当前项目文件夹下创建一个`go.mod`文件。
+2. 手动编辑`go.mod`中的require依赖项或执行`go get`自动发现、维护依赖。
+
+### 38 Gin框架
+
+#### 38.1 安装
+
+```bash
+go get -u github.com/gin-gonic/gin
+```
+
+#### 38.2 示例
+
+```golang 
+package main
+
+import "github.com/gin-gonic/gin"
+
+func main() {
+	r := gin.Default()
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "pong",
+		})
+	})
+  r.Run(":8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+}
+```
+
+### 39 RESTful API
+
+REST与技术无关，代表的是一种软件架构风格，REST是Representational State Transfer的简称，中文翻译为“表征状态转移”或“表现层状态转化”。
+
+推荐阅读[阮一峰 理解RESTful架构](http://www.ruanyifeng.com/blog/2011/09/restful.html)
+
+简单来说，REST的含义就是客户端与Web服务器之间进行交互的时候，使用HTTP协议中的4个请求方法代表不同的动作。
+
+- `GET`用来获取资源
+- `POST`用来新建资源
+- `PUT`用来更新资源
+- `DELETE`用来删除资源。
+
+只要API程序遵循了REST风格，那就可以称其为RESTful API。目前在前后端分离的架构中，前后端基本都是通过RESTful API来进行交互。
+
+例如，我们现在要编写一个管理书籍的系统，我们可以查询对一本书进行查询、创建、更新和删除等操作，我们在编写程序的时候就要设计客户端浏览器与我们Web服务端交互的方式和路径。按照经验我们通常会设计成如下模式：
+
+| 请求方法 |     URL      |     含义     |
+| :------: | :----------: | :----------: |
+|   GET    |    /book     | 查询书籍信息 |
+|   POST   | /create_book | 创建书籍记录 |
+|   POST   | /update_book | 更新书籍信息 |
+|   POST   | /delete_book | 删除书籍信息 |
+
+同样的需求我们按照RESTful API设计如下：
+
+| 请求方法 |  URL  |     含义     |
+| :------: | :---: | :----------: |
+|   GET    | /book | 查询书籍信息 |
+|   POST   | /book | 创建书籍记录 |
+|   PUT    | /book | 更新书籍信息 |
+|  DELETE  | /book | 删除书籍信息 |
+
+Gin框架支持开发RESTful API的开发。
+
+```go
+func main() {
+	r := gin.Default()
+	r.GET("/book", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "GET",
+		})
+	})
+
+	r.POST("/book", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "POST",
+		})
+	})
+
+	r.PUT("/book", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "PUT",
+		})
+	})
+
+	r.DELETE("/book", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "DELETE",
+		})
+	})
+}
+```
+
+开发RESTful API的时候我们通常使用[Postman](https://www.getpostman.com/)来作为客户端的测试工具。
+
+#### 39.1 渲染
+
+##### 39.1.1 JSON
+
+```go
+c.JSON(HTTP.StatusOK, func(c *gin.Context){ "message": "HELLO"})
+```
+
+
+
+##### 39.1.2  HTML
+
+我们首先定义一个存放模板文件的`templates`文件夹，然后在其内部按照业务分别定义一个`posts`文件夹和一个`users`文件夹。 `posts/index.html`文件的内容如下：
+
+```template
+{{define "posts/index.html"}}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>posts/index</title>
+</head>
+<body>
+    {{.title}}
+</body>
+</html>
+{{end}}
+```
+
+`users/index.html`文件的内容如下：
+
+```template
+{{define "users/index.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>users/index</title>
+</head>
+<body>
+    {{.title}}
+</body>
+</html>
+{{end}}
+```
+
+Gin框架中使用`LoadHTMLGlob()`或者`LoadHTMLFiles()`方法进行HTML模板渲染。
+
+```go
+func main() {
+	r := gin.Default()
+	r.LoadHTMLGlob("templates/**/*")
+  //静态文件处理
+  r.Static("/static", "./static")
+	//r.LoadHTMLFiles("templates/posts/index.html", "templates/users/index.html")
+	r.GET("/posts/index", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "posts/index.html", gin.H{
+			"title": "posts/index",
+		})
+	})
+
+	r.GET("users/index", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "users/index.html", gin.H{
+			"title": "users/index",
+		})
+	})
+
+	r.Run(":8080")
+}
+```
+
+##### 39.1.3  XML
+
+``` go
+func main() {
+	r := gin.Default()
+	// gin.H 是map[string]interface{}的缩写
+	r.GET("/someXML", func(c *gin.Context) {
+		// 方式一：自己拼接JSON
+		c.XML(http.StatusOK, gin.H{"message": "Hello world!"})
+	})
+	r.GET("/moreXML", func(c *gin.Context) {
+		// 方法二：使用结构体
+		type MessageRecord struct {
+			Name    string
+			Message string
+			Age     int
+		}
+		var msg MessageRecord
+		msg.Name = "小王子"
+		msg.Message = "Hello world!"
+		msg.Age = 18
+		c.XML(http.StatusOK, msg)
+	})
+	r.Run(":8080")
+}
+```
+
+##### 39.1.4  YMAL渲染
+
+```go
+r.GET("/someYAML", func(c *gin.Context) {
+	c.YAML(http.StatusOK, gin.H{"message": "ok", "status": http.StatusOK})
+})
+```
+
+##### 39.1.5 protobuf渲染
+
+```go
+r.GET("/someProtoBuf", func(c *gin.Context) {
+	reps := []int64{int64(1), int64(2)}
+	label := "test"
+	// protobuf 的具体定义写在 testdata/protoexample 文件中。
+	data := &protoexample.Test{
+		Label: &label,
+		Reps:  reps,
+	}
+	// 请注意，数据在响应中变为二进制数据
+	// 将输出被 protoexample.Test protobuf 序列化了的数据
+	c.ProtoBuf(http.StatusOK, data)
+})
+```
+
+##### 39.1.6 使用模板继承
+
+Gin框架默认都是使用单模板，如果需要使用`block template`功能，可以通过`"github.com/gin-contrib/multitemplate"`库实现，具体示例如下：
+
+首先，假设我们项目目录下的templates文件夹下有以下模板文件，其中`home.tmpl`和`index.tmpl`继承了`base.tmpl`：
+
+```bash
+templates
+├── includes
+│   ├── home.tmpl
+│   └── index.tmpl
+├── layouts
+│   └── base.tmpl
+└── scripts.tmpl
+```
+
+然后我们定义一个`loadTemplates`函数如下：
+
+```go
+func loadTemplates(templatesDir string) multitemplate.Renderer {
+	r := multitemplate.NewRenderer()
+	layouts, err := filepath.Glob(templatesDir + "/layouts/*.tmpl")
+	if err != nil {
+		panic(err.Error())
+	}
+	includes, err := filepath.Glob(templatesDir + "/includes/*.tmpl")
+	if err != nil {
+		panic(err.Error())
+	}
+	// 为layouts/和includes/目录生成 templates map
+	for _, include := range includes {
+		layoutCopy := make([]string, len(layouts))
+		copy(layoutCopy, layouts)
+		files := append(layoutCopy, include)
+		r.AddFromFiles(filepath.Base(include), files...)
+	}
+	return r
+}
+```
+
+我们在`main`函数中
+
+``` go
+func indexFunc(c *gin.Context){
+	c.HTML(http.StatusOK, "index.tmpl", nil)
+}
+
+func homeFunc(c *gin.Context){
+	c.HTML(http.StatusOK, "home.tmpl", nil)
+}
+
+func main(){
+	r := gin.Default()
+	r.HTMLRender = loadTemplates("./templates")
+	r.GET("/index", indexFunc)
+	r.GET("/home", homeFunc)
+	r.Run()
+}
+```
+
+#### 39.2 获取参数
+
+##### 39.2.1 query
+
+`querystring`指的是URL中`?`后面携带的参数，例如：`/user/search?username=小王子&address=沙河`。 获取请求的querystring参数的方法如下：
+
+```go
+func main() {
+	//Default返回一个默认的路由引擎
+	r := gin.Default()
+	r.GET("/user/search", func(c *gin.Context) {
+		username := c.DefaultQuery("username", "小王子")
+		//username := c.Query("username")
+		address := c.Query("address")
+		//输出json结果给调用方
+		c.JSON(http.StatusOK, gin.H{
+			"message":  "ok",
+			"username": username,
+			"address":  address,
+		})
+	})
+	r.Run()
+}
+```
+
+##### 39.2.2 form
+
+请求的数据通过form表单来提交，例如向`/user/search`发送一个POST请求，获取请求数据的方式如下：
+
+```go
+func main() {
+	//Default返回一个默认的路由引擎
+	r := gin.Default()
+	r.POST("/user/search", func(c *gin.Context) {
+		// DefaultPostForm取不到值时会返回指定的默认值
+		//username := c.DefaultPostForm("username", "小王子")
+		username := c.PostForm("username")
+		address := c.PostForm("address")
+		//输出json结果给调用方
+		c.JSON(http.StatusOK, gin.H{
+			"message":  "ok",
+			"username": username,
+			"address":  address,
+		})
+	})
+	r.Run(":8080")
+}
+```
+
+##### 39.2.3 path
+
+请求的参数通过URL路径传递，例如：`/user/search/小王子/沙河`。 获取请求URL路径中的参数的方式如下。
+
+```go
+func main() {
+	//Default返回一个默认的路由引擎
+	r := gin.Default()
+	r.GET("/user/search/:username/:address", func(c *gin.Context) {
+		username := c.Param("username")
+		address := c.Param("address")
+		//输出json结果给调用方
+		c.JSON(http.StatusOK, gin.H{
+			"message":  "ok",
+			"username": username,
+			"address":  address,
+		})
+	})
+
+	r.Run(":8080")
+}
+```
+
+##### 39.2.4 参数绑定
+
+为了能够更方便的获取请求相关参数，提高开发效率，我们可以基于请求的`Content-Type`识别请求数据类型并利用反射机制自动提取请求中`QueryString`、`form表单`、`JSON`、`XML`等参数到结构体中。 下面的示例代码演示了`.ShouldBind()`强大的功能，它能够基于请求自动提取`JSON`、`form表单`和`QueryString`类型的数据，并把值绑定到指定的结构体对象。
+
+```go
+// Binding from JSON
+type Login struct {
+	User     string `form:"user" json:"user" binding:"required"`
+	Password string `form:"password" json:"password" binding:"required"`
+}
+
+func main() {
+	router := gin.Default()
+
+	// 绑定JSON的示例 ({"user": "q1mi", "password": "123456"})
+	router.POST("/loginJSON", func(c *gin.Context) {
+		var login Login
+
+		if err := c.ShouldBind(&login); err == nil {
+			fmt.Printf("login info:%#v\n", login)
+			c.JSON(http.StatusOK, gin.H{
+				"user":     login.User,
+				"password": login.Password,
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+	})
+
+	// 绑定form表单示例 (user=q1mi&password=123456)
+	router.POST("/loginForm", func(c *gin.Context) {
+		var login Login
+		// ShouldBind()会根据请求的Content-Type自行选择绑定器
+		if err := c.ShouldBind(&login); err == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"user":     login.User,
+				"password": login.Password,
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+	})
+
+	// 绑定QueryString示例 (/loginQuery?user=q1mi&password=123456)
+	router.GET("/loginForm", func(c *gin.Context) {
+		var login Login
+		// ShouldBind()会根据请求的Content-Type自行选择绑定器
+		if err := c.ShouldBind(&login); err == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"user":     login.User,
+				"password": login.Password,
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+	})
+
+	// Listen and serve on 0.0.0.0:8080
+	router.Run(":8080")
+}
+```
+
+`ShouldBind`会按照下面的顺序解析请求中的数据完成绑定：
+
+1. 如果是 `GET` 请求，只使用 `Form` 绑定引擎（`query`）。
+2. 如果是 `POST` 请求，首先检查 `content-type` 是否为 `JSON` 或 `XML`，然后再使用 `Form`（`form-data`）。
+
+#### 39.3 文件上传
+
+##### 39.3.1 单个文件上传
+
+文件上传前端页面代码：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>上传文件示例</title>
+</head>
+<body>
+<form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="f1">
+    <input type="submit" value="上传">
+</form>
+</body>
+</html>
+```
+
+后端gin框架部分代码：
+
+```go
+func main() {
+	router := gin.Default()
+	// 处理multipart forms提交文件时默认的内存限制是32 MiB
+	// 可以通过下面的方式修改
+	// router.MaxMultipartMemory = 8 << 20  // 8 MiB
+	router.POST("/upload", func(c *gin.Context) {
+		// 单个文件
+		file, err := c.FormFile("f1")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+
+		log.Println(file.Filename)
+		dst := fmt.Sprintf("C:/tmp/%s", file.Filename)
+		// 上传文件到指定的目录
+		c.SaveUploadedFile(file, dst)
+		c.JSON(http.StatusOK, gin.H{
+			"message": fmt.Sprintf("'%s' uploaded!", file.Filename),
+		})
+	})
+	router.Run()
+}
+```
+
+#### 
+
+##### 39.3.2 多个文件上传
+
+```go
+func main() {
+	router := gin.Default()
+	// 处理multipart forms提交文件时默认的内存限制是32 MiB
+	// 可以通过下面的方式修改
+	// router.MaxMultipartMemory = 8 << 20  // 8 MiB
+	router.POST("/upload", func(c *gin.Context) {
+		// Multipart form
+		form, _ := c.MultipartForm()
+		files := form.File["file"]
+
+		for index, file := range files {
+			log.Println(file.Filename)
+			dst := fmt.Sprintf("C:/tmp/%s_%d", file.Filename, index)
+			// 上传文件到指定的目录
+			c.SaveUploadedFile(file, dst)
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": fmt.Sprintf("%d files uploaded!", len(files)),
+		})
+	})
+	router.Run()
+```
+
+#### 39.4 重定向
+
+##### 39.4.1 HTTP重定向
+
+HTTP 重定向很容易。 内部、外部重定向均支持。
+
+```go
+r.GET("/test", func(c *gin.Context) {
+	c.Redirect(http.StatusMovedPermanently, "http://www.sogo.com/")
+})
+```
+
+##### 39.4.2 路由重定向
+
+路由重定向，使用`HandleContext`：
+
+```go
+r.GET("/test", func(c *gin.Context) {
+    // 指定重定向的URL
+    c.Request.URL.Path = "/test2"
+    r.HandleContext(c)
+})
+r.GET("/test2", func(c *gin.Context) {
+    c.JSON(http.StatusOK, gin.H{"hello": "world"})
+})
+```
+
+#### 39.5 Gin路由
+
+##### 39.5.1 普通路由
+
+```go
+r.GET("/index", func(c *gin.Context) {...})
+r.GET("/login", func(c *gin.Context) {...})
+r.POST("/login", func(c *gin.Context) {...})
+```
+
+此外，还有一个可以匹配所有请求方法的`Any`方法如下：
+
+```go
+r.Any("/test", func(c *gin.Context) {...})
+```
+
+为没有配置处理函数的路由添加处理程序，默认情况下它返回404代码，下面的代码为没有匹配到路由的请求都返回`views/404.html`页面。
+
+```go
+r.NoRoute(func(c *gin.Context) {
+		c.HTML(http.StatusNotFound, "views/404.html", nil)
+	})
+```
+
+#### 
+
+##### 39.5.2 路由组
+
+我们可以将拥有共同URL前缀的路由划分为一个路由组。习惯性一对`{}`包裹同组的路由，这只是为了看着清晰，你用不用`{}`包裹功能上没什么区别。
+
+```go
+func main() {
+	r := gin.Default()
+	userGroup := r.Group("/user")
+	{
+		userGroup.GET("/index", func(c *gin.Context) {...})
+		userGroup.GET("/login", func(c *gin.Context) {...})
+		userGroup.POST("/login", func(c *gin.Context) {...})
+
+	}
+	shopGroup := r.Group("/shop")
+	{
+		shopGroup.GET("/index", func(c *gin.Context) {...})
+		shopGroup.GET("/cart", func(c *gin.Context) {...})
+		shopGroup.POST("/checkout", func(c *gin.Context) {...})
+	}
+	r.Run()
+}
+```
+
+路由组也是支持嵌套的，例如：
+
+```go
+shopGroup := r.Group("/shop")
+	{
+		shopGroup.GET("/index", func(c *gin.Context) {...})
+		shopGroup.GET("/cart", func(c *gin.Context) {...})
+		shopGroup.POST("/checkout", func(c *gin.Context) {...})
+		// 嵌套路由组
+		xx := shopGroup.Group("xx")
+		xx.GET("/oo", func(c *gin.Context) {...})
+	}
+```
+
+通常我们将路由分组用在划分业务逻辑或划分API版本时。
+
+##### 39.5.2 路由原理
+
+Gin框架中的路由使用的是[httprouter](https://github.com/julienschmidt/httprouter)这个库。
+
+其基本原理就是构造一个路由地址的前缀树。
+
+#### 39.6 Gin中间件
+
+Gin框架允许开发者在处理请求的过程中，加入用户自己的钩子（Hook）函数。这个钩子函数就叫中间件，中间件适合处理一些公共的业务逻辑，比如登录认证、权限校验、数据分页、记录日志、耗时统计等。
+
+##### 39.6.1 定义中间件
+
+Gin中的中间件必须是一个`gin.HandlerFunc`类型。例如我们像下面的代码一样定义一个统计请求耗时的中间件。
+
+```go
+// StatCost 是一个统计耗时请求耗时的中间件
+func StatCost() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Set("name", "小王子") // 可以通过c.Set在请求上下文中设置值，后续的处理函数能够取到该值
+		// 调用该请求的剩余处理程序
+		c.Next()
+		// 不调用该请求的剩余处理程序
+		// c.Abort()
+		// 计算耗时
+		cost := time.Since(start)
+		log.Println(cost)
+	}
+}
+```
+
+##### 39.6.2 注册中间件
+
+在gin框架中，我们可以为每个路由添加任意数量的中间件。
+
+###### 为全局路由注册
+
+```go
+func main() {
+	// 新建一个没有任何默认中间件的路由
+	r := gin.New()
+	// 注册一个全局中间件
+	r.Use(StatCost())
+	
+	r.GET("/test", func(c *gin.Context) {
+		name := c.MustGet("name").(string) // 从上下文取值
+		log.Println(name)
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Hello world!",
+		})
+	})
+	r.Run()
+}
+```
+
+###### 为某个路由单独注册
+
+```go
+// 给/test2路由单独注册中间件（可注册多个）
+	r.GET("/test2", StatCost(), func(c *gin.Context) {
+		name := c.MustGet("name").(string) // 从上下文取值
+		log.Println(name)
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Hello world!",
+		})
+	})
+```
+
+###### 为路由组注册中间件
+
+为路由组注册中间件有以下两种写法。
+
+写法1：
+
+```go
+shopGroup := r.Group("/shop", StatCost())
+{
+    shopGroup.GET("/index", func(c *gin.Context) {...})
+    ...
+}
+```
+
+写法2：
+
+```go
+shopGroup := r.Group("/shop")
+shopGroup.Use(StatCost())
+{
+    shopGroup.GET("/index", func(c *gin.Context) {...})
+    ...
+}
+```
+
+##### 39.6.3 中间件注意事项
+
+###### gin默认中间件
+
+`gin.Default()`默认使用了`Logger`和`Recovery`中间件，其中：
+
+- `Logger`中间件将日志写入`gin.DefaultWriter`，即使配置了`GIN_MODE=release`。
+- `Recovery`中间件会recover任何`panic`。如果有panic的话，会写入500响应码。
+
+如果不想使用上面两个默认的中间件，可以使用`gin.New()`新建一个没有任何默认中间件的路由。
+
+###### gin中间件中使用goroutine
+
+当在中间件或`handler`中启动新的`goroutine`时，**不能使用**原始的上下文（c *gin.Context），必须使用其只读副本（`c.Copy()`）。
+
+#### 39.7 运行多个服务
+
+我们可以在多个端口启动服务，例如：
+
+```go
+package main
+
+import (
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
+)
+
+var (
+	g errgroup.Group
+)
+
+func router01() http.Handler {
+	e := gin.New()
+	e.Use(gin.Recovery())
+	e.GET("/", func(c *gin.Context) {
+		c.JSON(
+			http.StatusOK,
+			gin.H{
+				"code":  http.StatusOK,
+				"error": "Welcome server 01",
+			},
+		)
+	})
+
+	return e
+}
+
+func router02() http.Handler {
+	e := gin.New()
+	e.Use(gin.Recovery())
+	e.GET("/", func(c *gin.Context) {
+		c.JSON(
+			http.StatusOK,
+			gin.H{
+				"code":  http.StatusOK,
+				"error": "Welcome server 02",
+			},
+		)
+	})
+
+	return e
+}
+
+func main() {
+	server01 := &http.Server{
+		Addr:         ":8080",
+		Handler:      router01(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	server02 := &http.Server{
+		Addr:         ":8081",
+		Handler:      router02(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+   // 借助errgroup.Group或者自行开启两个goroutine分别启动两个服务
+	g.Go(func() error {
+		return server01.ListenAndServe()
+	})
+
+	g.Go(func() error {
+		return server02.ListenAndServe()
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+#### 39.8 参数绑定
+
+```go
+type UesrInfo {
+  Username string `form:"username" json:"username" binding:"required"`
+  Password string `form:"password" json:"password" binding:"required"`
+}
+var u UserInfo
+c.ShouldBind(&u) // 可以减少参数一个赋值, 会根据请求头中的Content-Type解析
+c.ShouldBindBodyWidth(&u, binding.JSON | binding.XML | binding.Form)
+```
+
+#### 39.9 日志库logrus
+
+##### 39.9.1 介绍
+
+Logrus是Go（golang）的结构化logger，与标准库logger完全API兼容。
+
+它有以下特点：
+
+- 完全兼容标准日志库，拥有七种日志级别：`Trace`, `Debug`, `Info`, `Warning`, `Error`, `Fatal`and `Panic`。
+- 可扩展的Hook机制，允许使用者通过Hook的方式将日志分发到任意地方，如本地文件系统，logstash，elasticsearch或者mq等，或者通过Hook定义日志内容和格式等
+- 可选的日志输出格式，内置了两种日志格式JSONFormater和TextFormatter，还可以自定义日志格式
+- Field机制，通过Filed机制进行结构化的日志记录
+- 线程安全
+
+##### 39.9.2 安装
+
+```bash
+go get github.com/sirupsen/logrus
+```
+
+##### 39.9.2 基本示例
+
+```go
+package main
+
+import (
+  log "github.com/sirupsen/logrus"
+)
+
+func main() {
+  log.WithFields(log.Fields{
+    "animal": "dog",
+  }).Info("一条舔狗出现了。")
+}
+```
+
+##### 39.9.3 进阶示例
+
+```go
+package main
+
+import (
+  "os"
+  "github.com/sirupsen/logrus"
+)
+
+// 创建一个新的logger实例。可以创建任意多个。
+var log = logrus.New()
+
+func main() {
+  // 设置日志输出为os.Stdout
+  log.Out = os.Stdout
+
+  // 可以设置像文件等任意`io.Writer`类型作为日志输出
+  // file, err := os.OpenFile("logrus.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+  // if err == nil {
+  //  log.Out = file
+  // } else {
+  //  log.Info("Failed to log to file, using default stderr")
+  // }
+
+  log.WithFields(logrus.Fields{
+    "animal": "dog",
+    "size":   10,
+  }).Info("一群舔狗出现了。")
+}
+```
+
+##### 39.9.4 日志级别
+
+Logrus有七个日志级别：`Trace`, `Debug`, `Info`, `Warning`, `Error`, `Fatal`and `Panic`。
+
+```go
+log.Trace("Something very low level.")
+log.Debug("Useful debugging information.")
+log.Info("Something noteworthy happened!")
+log.Warn("You should probably take a look at this.")
+log.Error("Something failed but I'm not quitting.")
+// 记完日志后会调用os.Exit(1) 
+log.Fatal("Bye.")
+// 记完日志后会调用 panic() 
+log.Panic("I'm bailing.")
+```
+
+你可以在Logger上设置日志记录级别，然后它只会记录具有该级别或以上级别任何内容的条目：
+
+```go
+// 会记录info及以上级别 (warn, error, fatal, panic)
+log.SetLevel(log.InfoLevel)
+```
+
+如果你的程序支持debug或环境变量模式，设置`log.Level = logrus.DebugLevel`会很有帮助。
+
+##### 39.9.5 字段
+
+Logrus鼓励通过日志字段进行谨慎的结构化日志记录，而不是冗长的、不可解析的错误消息。
+
+例如，区别于使用`log.Fatalf("Failed to send event %s to topic %s with key %d")`，你应该使用如下方式记录更容易发现的内容:
+
+```go
+log.WithFields(log.Fields{
+  "event": event,
+  "topic": topic,
+  "key": key,
+}).Fatal("Failed to send event")
+```
+
+`WithFields`的调用是可选的。
+
+##### 39.9.6 默认字段
+
+通常，将一些字段始终附加到应用程序的全部或部分的日志语句中会很有帮助。例如，你可能希望始终在请求的上下文中记录`request_id`和`user_ip`。
+
+区别于在每一行日志中写上`log.WithFields(log.Fields{"request_id": request_id, "user_ip": user_ip})`，你可以向下面的示例代码一样创建一个`logrus.Entry`去传递这些字段。
+
+```go
+requestLogger := log.WithFields(log.Fields{"request_id": request_id, "user_ip": user_ip})
+requestLogger.Info("something happened on that request") # will log request_id and user_ip
+requestLogger.Warn("something not great happened")
+```
+
+##### 39.9.7 日志条目
+
+除了使用`WithField`或`WithFields`添加的字段外，一些字段会自动添加到所有日志记录事中:
+
+- time：记录日志时的时间戳
+- msg：记录的日志信息
+- level：记录的日志级别
+
+##### 39.9.8 Hooks
+
+你可以添加日志级别的钩子（Hook）。例如，向异常跟踪服务发送`Error`、`Fatal`和`Panic`、信息到StatsD或同时将日志发送到多个位置，例如syslog。
+
+Logrus配有内置钩子。在`init`中添加这些内置钩子或你自定义的钩子：
+
+```go
+import (
+  log "github.com/sirupsen/logrus"
+  "gopkg.in/gemnasium/logrus-airbrake-hook.v2" // the package is named "airbrake"
+  logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+  "log/syslog"
+)
+
+func init() {
+
+  // Use the Airbrake hook to report errors that have Error severity or above to
+  // an exception tracker. You can create custom hooks, see the Hooks section.
+  log.AddHook(airbrake.NewHook(123, "xyz", "production"))
+
+  hook, err := logrus_syslog.NewSyslogHook("udp", "localhost:514", syslog.LOG_INFO, "")
+  if err != nil {
+    log.Error("Unable to connect to local syslog daemon")
+  } else {
+    log.AddHook(hook)
+  }
+}
+```
+
+意：Syslog钩子还支持连接到本地syslog（例如. “/dev/log” or “/var/run/syslog” or “/var/run/log”)。有关详细信息，请查看[syslog hook README](https://github.com/sirupsen/logrus/blob/master/hooks/syslog/README.md)。
+
+##### 39.9.9 格式化
+
+logrus内置以下两种日志格式化程序：
+
+```
+logrus.TextFormatter` `logrus.JSONFormatter
+```
+
+还支持一些第三方的格式化程序，详见项目首页。
+
+##### 39.9.10 记录函数名
+
+如果你希望将调用的函数名添加为字段，请通过以下方式设置：
+
+```go
+log.SetReportCaller(true)
+```
+
+这会将调用者添加为”method”，如下所示：
+
+```json
+{"animal":"penguin","level":"fatal","method":"github.com/sirupsen/arcticcreatures.migrate","msg":"a penguin swims by",
+"time":"2014-03-10 19:57:38.562543129 -0400 EDT"}
+```
+
+**注意：**，开启这个模式会增加性能开销。
+
+##### 39.9.11 线程安全
+
+默认的logger在并发写的时候是被mutex保护的，比如当同时调用hook和写log时mutex就会被请求，有另外一种情况，文件是以appending mode打开的， 此时的并发操作就是安全的，可以用`logger.SetNoLock()`来关闭它。
+
+##### 39.9.12 gin框架使用logrus
+
+```go
+// a gin with logrus demo
+
+var log = logrus.New()
+
+func init() {
+	// Log as JSON instead of the default ASCII formatter.
+	log.Formatter = &logrus.JSONFormatter{}
+	// Output to stdout instead of the default stderr
+	// Can be any io.Writer, see below for File example
+	f, _ := os.Create("./gin.log")
+	log.Out = f
+	gin.SetMode(gin.ReleaseMode)
+	gin.DefaultWriter = log.Out
+	// Only log the warning severity or above.
+	log.Level = logrus.InfoLevel
+}
+
+func main() {
+	// 创建一个默认的路由引擎
+	r := gin.Default()
+	// GET：请求方式；/hello：请求的路径
+	// 当客户端以GET方法请求/hello路径时，会执行后面的匿名函数
+	r.GET("/hello", func(c *gin.Context) {
+		log.WithFields(logrus.Fields{
+			"animal": "walrus",
+			"size":   10,
+		}).Warn("A group of walrus emerges from the ocean")
+		// c.JSON：返回JSON格式的数据
+		c.JSON(200, gin.H{
+			"message": "Hello world!",
+		})
+	})
+	// 启动HTTP服务，默认在0.0.0.0:8080启动服务
+	r.Run()
+}
+```
+
+##### 39.9.13 404处理
+
+``` go
+r := gin.Default()
+r.NoRoute(func(c *gin.Context){
+  c.HTML(http.StatusOk, '404.html', nil)
+})
+```
+
+##### 39.9.14 Marshal 和UnMarshal序列化问题
+
+序列化接口类型数据，传入 int类型值，反序列化则是float64类型，可用gob序列化解决
+
+### 40 Context
+
+在 Go http包的Server中，每一个请求在都有一个对应的 goroutine 去处理。请求处理函数通常会启动额外的 goroutine 用来访问后端服务，比如数据库和RPC服务。用来处理一个请求的 goroutine 通常需要访问一些与请求特定的数据，比如终端用户的身份认证信息、验证相关的token、请求的截止时间。 当一个请求被取消或超时时，所有用来处理该请求的 goroutine 都应该迅速退出，然后系统才能释放这些 goroutine 占用的资源。
+
+#### 40.1 定义
+
+Go1.7加入了一个新的标准库`context`，它定义了`Context`类型，专门用来简化 对于处理单个请求的多个 goroutine 之间与请求域的数据、取消信号、截止时间等相关操作，这些操作可能涉及多个 API 调用。
+
+对服务器传入的请求应该创建上下文，而对服务器的传出调用应该接受上下文。它们之间的函数调用链必须传递上下文，或者可以使用`WithCancel`、`WithDeadline`、`WithTimeout`或`WithValue`创建的派生上下文。当一个上下文被取消时，它派生的所有上下文也被取消。
+
+#### 40.2  Context接口
+
+`context.Context`是一个接口，该接口定义了四个需要实现的方法。具体签名如下：
+
+```go
+type Context interface {
+    Deadline() (deadline time.Time, ok bool)
+    Done() <-chan struct{}
+    Err() error
+    Value(key interface{}) interface{}
+}
+```
+
+其中：
+
+- `Deadline`方法需要返回当前`Context`被取消的时间，也就是完成工作的截止时间（deadline）；
+
+- `Done`方法需要返回一个`Channel`，这个Channel会在当前工作完成或者上下文被取消之后关闭，多次调用`Done`方法会返回同一个Channel；
+
+- ```
+  Err
+  ```
+
+  方法会返回当前
+
+  ```
+  Context
+  ```
+
+  结束的原因，它只会在
+
+  ```
+  Done
+  ```
+
+  返回的Channel被关闭时才会返回非空的值；
+
+  - 如果当前`Context`被取消就会返回`Canceled`错误；
+  - 如果当前`Context`超时就会返回`DeadlineExceeded`错误；
+
+- `Value`方法会从`Context`中返回键对应的值，对于同一个上下文来说，多次调用`Value` 并传入相同的`Key`会返回相同的结果，该方法仅用于传递跨API和进程间跟请求域的数据；
+
+#### 40.3 Background()和TODO()
+
+Go内置两个函数：`Background()`和`TODO()`，这两个函数分别返回一个实现了`Context`接口的`background`和`todo`。我们代码中最开始都是以这两个内置的上下文对象作为最顶层的`partent context`，衍生出更多的子上下文对象。
+
+`Background()`主要用于main函数、初始化以及测试代码中，作为Context这个树结构的最顶层的Context，也就是根Context。
+
+`TODO()`，它目前还不知道具体的使用场景，如果我们不知道该使用什么Context的时候，可以使用这个。
+
+`background`和`todo`本质上都是`emptyCtx`结构体类型，是一个不可取消，没有设置截止时间，没有携带任何值的Context。
+
+#### 40.4 With系列函数
+
+##### 40.4.1 WithCancel
+
+`WithCancel`的函数签名如下：
+
+```go
+func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
+```
+
+`WithCancel`返回带有新Done通道的父节点的副本。当调用返回的cancel函数或当关闭父上下文的Done通道时，将关闭返回上下文的Done通道，无论先发生什么情况。
+
+取消此上下文将释放与其关联的资源，因此代码应该在此上下文中运行的操作完成后立即调用cancel。
+
+```go
+func gen(ctx context.Context) <-chan int {
+		dst := make(chan int)
+		n := 1
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return // return结束该goroutine，防止泄露
+				case dst <- n:
+					n++
+				}
+			}
+		}()
+		return dst
+	}
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // 当我们取完需要的整数后调用cancel
+
+	for n := range gen(ctx) {
+		fmt.Println(n)
+		if n == 5 {
+			break
+		}
+	}
+}
+```
+
+上面的示例代码中，`gen`函数在单独的goroutine中生成整数并将它们发送到返回的通道。 gen的调用者在使用生成的整数之后需要取消上下文，以免`gen`启动的内部goroutine发生泄漏。
+
+##### 40.4.2 WithDeadline
+
+`WithDeadline`的函数签名如下：
+
+```go
+func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc)
+```
+
+返回父上下文的副本，并将deadline调整为不迟于d。如果父上下文的deadline已经早于d，则WithDeadline(parent, d)在语义上等同于父上下文。当截止日过期时，当调用返回的cancel函数时，或者当父上下文的Done通道关闭时，返回上下文的Done通道将被关闭，以最先发生的情况为准。
+
+取消此上下文将释放与其关联的资源，因此代码应该在此上下文中运行的操作完成后立即调用cancel。
+
+```go
+func main() {
+	d := time.Now().Add(50 * time.Millisecond)
+	ctx, cancel := context.WithDeadline(context.Background(), d)
+
+	// 尽管ctx会过期，但在任何情况下调用它的cancel函数都是很好的实践。
+	// 如果不这样做，可能会使上下文及其父类存活的时间超过必要的时间。
+	defer cancel()
+
+	select {
+	case <-time.After(1 * time.Second):
+		fmt.Println("overslept")
+	case <-ctx.Done():
+		fmt.Println(ctx.Err())
+	}
+}
+```
+
+上面的代码中，定义了一个50毫秒之后过期的deadline，然后我们调用`context.WithDeadline(context.Background(), d)`得到一个上下文（ctx）和一个取消函数（cancel），然后使用一个select让主程序陷入等待：等待1秒后打印`overslept`退出或者等待ctx过期后退出。 因为ctx50秒后就过期，所以`ctx.Done()`会先接收到值，上面的代码会打印ctx.Err()取消原因。
+
+##### 40.4.3 WithTimeout
+
+`WithTimeout`的函数签名如下：
+
+```go
+func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
+```
+
+`WithTimeout`返回`WithDeadline(parent, time.Now().Add(timeout))`。
+
+取消此上下文将释放与其相关的资源，因此代码应该在此上下文中运行的操作完成后立即调用cancel，通常用于数据库或者网络连接的超时控制。具体示例如下：
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"time"
+)
+
+// context.WithTimeout
+
+var wg sync.WaitGroup
+
+func worker(ctx context.Context) {
+LOOP:
+	for {
+		fmt.Println("db connecting ...")
+		time.Sleep(time.Millisecond * 10) // 假设正常连接数据库耗时10毫秒
+		select {
+		case <-ctx.Done(): // 50毫秒后自动调用
+			break LOOP
+		default:
+		}
+	}
+	fmt.Println("worker done!")
+	wg.Done()
+}
+
+func main() {
+	// 设置一个50毫秒的超时
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
+	wg.Add(1)
+	go worker(ctx)
+	time.Sleep(time.Second * 5)
+	cancel() // 通知子goroutine结束
+	wg.Wait()
+	fmt.Println("over")
+}
+```
+
+##### 40.4.4 WithValue
+
+`WithValue`函数能够将请求作用域的数据与 Context 对象建立关系。声明如下：
+
+```go
+func WithValue(parent Context, key, val interface{}) Context
+```
+
+`WithValue`返回父节点的副本，其中与key关联的值为val。
+
+仅对API和进程间传递请求域的数据使用上下文值，而不是使用它来传递可选参数给函数。
+
+所提供的键必须是可比较的，并且不应该是`string`类型或任何其他内置类型，以避免使用上下文在包之间发生冲突。`WithValue`的用户应该为键定义自己的类型。为了避免在分配给interface{}时进行分配，上下文键通常具有具体类型`struct{}`。或者，导出的上下文关键变量的静态类型应该是指针或接口。
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"time"
+)
+
+// context.WithValue
+
+type TraceCode string
+
+var wg sync.WaitGroup
+
+func worker(ctx context.Context) {
+	key := TraceCode("TRACE_CODE")
+	traceCode, ok := ctx.Value(key).(string) // 在子goroutine中获取trace code
+	if !ok {
+		fmt.Println("invalid trace code")
+	}
+LOOP:
+	for {
+		fmt.Printf("worker, trace code:%s\n", traceCode)
+		time.Sleep(time.Millisecond * 10) // 假设正常连接数据库耗时10毫秒
+		select {
+		case <-ctx.Done(): // 50毫秒后自动调用
+			break LOOP
+		default:
+		}
+	}
+	fmt.Println("worker done!")
+	wg.Done()
+}
+
+func main() {
+	// 设置一个50毫秒的超时
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
+	// 在系统的入口中设置trace code传递给后续启动的goroutine实现日志数据聚合
+	ctx = context.WithValue(ctx, TraceCode("TRACE_CODE"), "12512312234")
+	wg.Add(1)
+	go worker(ctx)
+	time.Sleep(time.Second * 5)
+	cancel() // 通知子goroutine结束
+	wg.Wait()
+	fmt.Println("over")
+}
+```
+
+#### 40.5 使用Context的注意事项
+
+- 推荐以参数的方式显示传递Context
+- 以Context作为参数的函数方法，应该把Context作为第一个参数。
+- 给一个函数方法传递Context的时候，不要传递nil，如果不知道传递什么，就使用context.TODO()
+- Context的Value相关方法应该传递请求域的必要数据，不应该用于传递可选参数
+- Context是线程安全的，可以放心的在多个goroutine中传递
+
+#### 40.6 客户端超时取消示例
+
+调用服务端API时如何在客户端实现超时控制？
+
+server端
+
+```go
+// context_timeout/server/main.go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"net/http"
+
+	"time"
+)
+
+// server端，随机出现慢响应
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	number := rand.Intn(2)
+	if number == 0 {
+		time.Sleep(time.Second * 10) // 耗时10秒的慢响应
+		fmt.Fprintf(w, "slow response")
+		return
+	}
+	fmt.Fprint(w, "quick response")
+}
+
+func main() {
+	http.HandleFunc("/", indexHandler)
+	err := http.ListenAndServe(":8000", nil)
+	if err != nil {
+		panic(err)
+	}
+}
+```
+
+client端
+
+```go
+// context_timeout/client/main.go
+package main
+
+import (
+	"context"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"sync"
+	"time"
+)
+
+// 客户端
+
+type respData struct {
+	resp *http.Response
+	err  error
+}
+
+func doCall(ctx context.Context) {
+	transport := http.Transport{
+	   // 请求频繁可定义全局的client对象并启用长链接
+	   // 请求不频繁使用短链接
+	   DisableKeepAlives: true, 	}
+	client := http.Client{
+		Transport: &transport,
+	}
+
+	respChan := make(chan *respData, 1)
+	req, err := http.NewRequest("GET", "http://127.0.0.1:8000/", nil)
+	if err != nil {
+		fmt.Printf("new requestg failed, err:%v\n", err)
+		return
+	}
+	req = req.WithContext(ctx) // 使用带超时的ctx创建一个新的client request
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()
+	go func() {
+		resp, err := client.Do(req)
+		fmt.Printf("client.do resp:%v, err:%v\n", resp, err)
+		rd := &respData{
+			resp: resp,
+			err:  err,
+		}
+		respChan <- rd
+		wg.Done()
+	}()
+
+	select {
+	case <-ctx.Done():
+		//transport.CancelRequest(req)
+		fmt.Println("call api timeout")
+	case result := <-respChan:
+		fmt.Println("call server api success")
+		if result.err != nil {
+			fmt.Printf("call server api failed, err:%v\n", result.err)
+			return
+		}
+		defer result.resp.Body.Close()
+		data, _ := ioutil.ReadAll(result.resp.Body)
+		fmt.Printf("resp:%v\n", string(data))
+	}
+}
+
+func main() {
+	// 定义一个100毫秒的超时
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel() // 调用cancel释放子goroutine资源
+	doCall(ctx)
+}
+```
+
+### 41  Flag
+
+Go语言内置的`flag`包实现了命令行参数的解析，`flag`包使得开发命令行工具更为简单。
+
+#### 41.1 os.Args
+
+如果你只是简单的想要获取命令行参数，可以像下面的代码示例一样使用`os.Args`来获取命令行参数。
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+//os.Args demo
+func main() {
+	//os.Args是一个[]string
+	if len(os.Args) > 0 {
+		for index, arg := range os.Args {
+			fmt.Printf("args[%d]=%v\n", index, arg)
+		}
+	}
+}
+```
+
+将上面的代码执行`go build -o "args_demo"`编译之后，执行：
+
+```bash
+$ ./args_demo a b c d
+args[0]=./args_demo
+args[1]=a
+args[2]=b
+args[3]=c
+args[4]=d
+```
+
+`os.Args`是一个存储命令行参数的字符串切片，它的第一个元素是执行文件的名称。
+
+#### 41.2 flag包基本使用
+
+##### 41.2.1 导入flag包
+
+```go
+import flag
+```
+
+##### 41.2.2 flag参数类型
+
+flag包支持的命令行参数类型有`bool`、`int`、`int64`、`uint`、`uint64`、`float``float64`、`string`、`duration`。
+
+|   flag参数   |                            有效值                            |
+| :----------: | :----------------------------------------------------------: |
+|  字符串flag  |                          合法字符串                          |
+|   整数flag   |           1234、0664、0x1234等类型，也可以是负数。           |
+|  浮点数flag  |                          合法浮点数                          |
+| bool类型flag |  1, 0, t, f, T, F, true, false, TRUE, FALSE, True, False。   |
+|  时间段flag  | 任何合法的时间段字符串。如”300ms”、”-1.5h”、”2h45m”。 合法的单位有”ns”、”us” /“µs”、”ms”、”s”、”m”、”h”。 |
+
+##### 41.2.3 定义命令行flag参数
+
+有以下两种常用的定义命令行`flag`参数的方法。
+
+* ### flag.Type()
+
+  基本格式如下：
+
+  `flag.Type(flag名, 默认值, 帮助信息)*Type` 例如我们要定义姓名、年龄、婚否三个命令行参数，我们可以按如下方式定义：
+
+  ```go
+  name := flag.String("name", "张三", "姓名")
+  age := flag.Int("age", 18, "年龄")
+  married := flag.Bool("married", false, "婚否")
+  delay := flag.Duration("d", 0, "时间间隔")
+  ```
+
+  需要注意的是，此时`name`、`age`、`married`、`delay`均为对应类型的指针。
+
+* ### flag.TypeVar()
+
+  基本格式如下： `flag.TypeVar(Type指针, flag名, 默认值, 帮助信息)` 例如我们要定义姓名、年龄、婚否三个命令行参数，我们可以按如下方式定义：
+
+  ```go
+  var name string
+  var age int
+  var married bool
+  var delay time.Duration
+  flag.StringVar(&name, "name", "张三", "姓名")
+  flag.IntVar(&age, "age", 18, "年龄")
+  flag.BoolVar(&married, "married", false, "婚否")
+  flag.DurationVar(&delay, "d", 0, "时间间隔")
+  ```
+
+* ### flag.Parse()
+
+  通过以上两种方法定义好命令行flag参数后，需要通过调用`flag.Parse()`来对命令行参数进行解析。
+
+  支持的命令行参数格式有以下几种：
+
+  - `-flag xxx` （使用空格，一个`-`符号）
+  - `--flag xxx` （使用空格，两个`-`符号）
+  - `-flag=xxx` （使用等号，一个`-`符号）
+  - `--flag=xxx` （使用等号，两个`-`符号）
+
+  其中，布尔类型的参数必须使用等号的方式指定。
+
+  Flag解析在第一个非flag参数（单个”-“不是flag参数）之前停止，或者在终止符”–“之后停止。
+
+* ### flag其它函数
+
+  ```go
+  flag.Args()  ////返回命令行参数后的其他参数，以[]string类型
+  flag.NArg()  //返回命令行参数后的其他参数个数
+  flag.NFlag() //返回使用的命令行参数个数
+  ```
+
+* ### 完整示例
+
+  ```go
+  func main() {
+  	//定义命令行参数方式1
+  	var name string
+  	var age int
+  	var married bool
+  	var delay time.Duration
+  	flag.StringVar(&name, "name", "张三", "姓名")
+  	flag.IntVar(&age, "age", 18, "年龄")
+  	flag.BoolVar(&married, "married", false, "婚否")
+  	flag.DurationVar(&delay, "d", 0, "延迟的时间间隔")
+  
+  	//解析命令行参数
+  	flag.Parse()
+  	fmt.Println(name, age, married, delay)
+  	//返回命令行参数后的其他参数
+  	fmt.Println(flag.Args())
+  	//返回命令行参数后的其他参数个数
+  	fmt.Println(flag.NArg())
+  	//返回使用的命令行参数个数
+  	fmt.Println(flag.NFlag())
+  ```
+
+命令行参数使用提示：
+
+```bash
+$ ./flag_demo -help
+Usage of ./flag_demo:
+  -age int
+        年龄 (default 18)
+  -d duration
+        时间间隔
+  -married
+        婚否
+  -name string
+        姓名 (default "张三")
+```
+
+正常使用命令行flag参数：
+
+```bash
+$ ./flag_demo -name 沙河娜扎 --age 28 -married=false -d=1h30m
+沙河娜扎 28 false 1h30m0s
+[]
+0
+4
+```
+
+使用非flag命令行参数：
+
+```bash
+$ ./flag_demo a b c
+张三 18 false 0s
+[a b c]
+3
+0
+```
+
+### 42 性能调优
+
+https://www.liwenzhou.com/posts/Go/performance_optimisation/
+
+### 43 日志
+
+#### 43.1 ELK
+
+![image-20210109223911023](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20210109223911023.png)
+
+![image-20210109223941993](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20210109223941993.png)
+
+#### 43.2 架构设计
+
+![image-20210109224217718](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20210109224217718.png)
+
+#### 43.3 kafka
+
+![image-20210109225147129](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20210109225147129.png)
+
+##### 43.3.1 log agent 开发
+
+下载安装
+
+``` bash
+go get github.com/Shopify/sarama
+```
+
+示例 
+
+``` go
+package main
+
+import (
+	"fmt"
+
+	"github.com/Shopify/sarama"
+)
+
+func main() {
+	// 1. 生产者配置
+	config := sarama.NewConfig()
+	// 发送数据leader与follower都需要确认 （ACK）
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	// 新选出一个Partition
+	config.Producer.Partitioner = sarama.NewRandomPartitioner
+	// 确认
+	config.Producer.Return.Successes = true
+
+	// 2.连接kafka
+	client, err := sarama.NewSyncProducer([]string{"127.0.0.1:9092"}, config)
+
+	if err != nil {
+		fmt.Println("Producer closed, err: ", err)
+		return
+	}
+	defer client.Close()
+	// 3. 封装消息
+	msg := &sarama.ProducerMessage{}
+	msg.Topic = "web_log"
+	msg.Value = sarama.StringEncoder("this is a test log")
+
+	// 4. 发送消息
+	pid, offset, err := client.SendMessage(msg)
+	if err != nil {
+		fmt.Println("Send message failed, err: ", err)
+		return
+	}
+	fmt.Printf("pid: %v offset: %v\n", pid, offset)
+}
+
+```
+
+##### 43.3.1	tailf包
+
+下载
+
+```bash
+go get github.com/hpcloud/tail
+```
+
+示例
+
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/hpcloud/tail"
+)
+
+func main() {
+	filename := `xx.log`
+	config := tail.Config{
+		ReOpen:    true,
+		Follow:    true,
+		Location:  &tail.SeekInfo{Offset: 0, Whence: 2},
+		MustExist: false,
+		Poll:      false,
+	}
+	tails, err := tail.TailFile(filename, config)
+	if err != nil {
+		fmt.Printf("tail %s failed, err: %v \n", filename, err)
+		return
+	}
+	var (
+		msg *tail.Line
+		ok  bool
+	)
+	for {
+		msg, ok = <-tails.Lines
+		if !ok {
+			fmt.Printf("tail file close reopen, filename: %s\n", tails.Filename)
+			time.Sleep(time.Second)
+			continue
+		}
+		fmt.Println("msg:", msg.Text)
+	}
+}
+
+```
+
+### 44 ETCD
+
+#### 44.1 特点
+
+* 完全复制：集群中的每个节点都可以使用完整的存档
+* 高可复用性：etcd可用于避免于硬件的单点故障或网络问题
+* 一致性：每次读取都会返回跨多主机的最新写入
+* 简单：包括一个定义良好、面向用户的API(gRPC)
+* 安全：实现了带有可选的客户端证书身份验证的自动化TLS
+* 快速：每秒10000次写入的基准速度
+* 可靠：使用Raft算法实现了强一致、高可用的服务存储目录
+
+![image-20210110111922719](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20210110111922719.png)
+
+![image-20210112063540728](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20210112063540728.png)
+
+#### 44.2 架构
+
+![image-20210112063827214](Golang%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%8D%87%E5%A4%A9.assets/image-20210112063827214.png)
+
+#### 44.3 etcd启动
+
+```bash
+etcd --data-dir=data.etcd --name n30 \
+	--initial-advertise--peer-urls http://10.88.22.111:2380 --listener-peer-urls http://10.88.22.111:2380 \
+	--initial-client--peer-urls http://10.88.22.111:2379 --listener-client-urls http://10.88.22.111:2379 \
+	--initial-cluster ${CLUSTER} \
+	--initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+	
+	
+	client端调用
+	etcdctl --endpoints=http://127.0.0.1:2379 put bbliao "dsb"
+	etcdctl --endpoints=http://127.0.0.1:2379 get bbliao
+	etcdctl --endpoints=http://127.0.0.1:2379 del bbliao
+	
+```
+
+#### 44.4 import installer
+
+```bash
+go get go.etcd.io/etcd/clientv3
+```
+
